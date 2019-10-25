@@ -10,10 +10,11 @@ Find Gaia sources in S-PLUS catalog to perform calibration
 import numpy as np
 from astropy.coordinates import SkyCoord
 import astropy.units as u
-from astroquery.gaia import Gaia
+#from astroquery.gaia import Gaia
 from astroquery.vizier import Vizier
+from astropy.coordinates import Angle
 from astropy.io import fits
-from astropy.table import Table, join, vstack
+from astropy.table import Table, hstack
 
 Vizier.ROW_LIMIT = 5000
 
@@ -94,9 +95,14 @@ def find_gaia_stars(ra, dec):
 
     """
 
-    splus_coords = SkyCoord(ra=ra, dec=dec, unit=(u.hour, u.deg), frame='icrs')
+    splus_coords = SkyCoord(ra=ra, dec=dec, unit=(u.hour, u.deg), frame='icrs', equinox='J2000')
 
-    gaia_data = Vizier.query_region(splus_coords, radius=1 * u.deg, catalog=['gaia'])['I/345/gaia2']
+    #gaia_data = Vizier.query_region(splus_coords, radius=Angle(1.0, "deg"), catalog=['I/345'])[0]
+    #gaia_data = Vizier(catalog='I/345', columns=['*', 'DR2Name', 'RA_ICRS', 'DE_ICRS', 'pmRA', 'pmDE', 'FG', 'e_FG', 'Gmag', 'e_Gmag', 'FBP', 'e_FBP', 'BPmag', 'e_BPmag', 'FRP', 'e_FRP', 'RPmag', 'e_RPmag', 'Teff', 'Rad', 'RAJ2000', 'DEJ2000']).query_region(splus_coords, radius=1*u.deg)[0]
+
+    v = Vizier(columns=['*', 'RAJ2000', 'DEJ2000'], catalog='I/345')
+    v.ROW_LIMIT = 999999999
+    gaia_data = v.query_region(splus_coords, radius=Angle(1.0, "deg"))[0]
 
     # Only keep objects with detected proper motions to exclude contamination by galaxies
     # FIXME: We are selecting objects with pre-calculated radius
@@ -125,6 +131,21 @@ def plot_hr(gaia_data):
 
     plt.show()
 
+def match_splus_gaia(splus_catalog, gaia_catalog):
+    """
+
+    match the splus and gaia catalogs and return the joined table
+
+    """
+
+    a = SkyCoord(ra=splus_catalog['ALPHA_J2000'], dec=splus_catalog['DELTA_J2000'], unit=(u.deg, u.deg))
+    b = SkyCoord(ra=gaia_data['RAJ2000'], dec=gaia_data['DEJ2000'], unit=(u.deg, u.deg))
+    idx, d2d, d3d = a.match_to_catalog_3d(b)
+
+    mask = d2d < 1.0 * u.arcsec
+    result = hstack([catalog_stars[mask], gaia_data[idx[mask]]])
+
+    return result
 
 # This is just for testing purposes:
 if __name__ == '__main__':
@@ -139,9 +160,10 @@ if __name__ == '__main__':
 
     catalog = read_splus_catalog('data/STRIPE82-0001/', 'STRIPE82-0001', 'R')
     catalog_stars = find_splus_stars(catalog)
-    gaia_data = find_gaia_stars(catalog_stars, test_ra, test_dec)
+    gaia_data = find_gaia_stars(test_ra, test_dec)
+    match_data = match_splus_gaia(catalog_stars, gaia_data)
 
-    plot_hr(matched_catalog)
+    plot_hr(gaia_data)
 
     # This is just some thoughts about models:
     #
@@ -151,6 +173,3 @@ if __name__ == '__main__':
     #                    for i in range(model[0].header['NAXIS1'])])
     #
     # flux = model[0].data
-
-
-
