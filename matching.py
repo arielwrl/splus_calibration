@@ -139,7 +139,7 @@ def match_splus_gaia(splus_catalog, gaia_catalog):
     idx, d2d, d3d = a.match_to_catalog_3d(b)
 
     mask = d2d < 1.0 * u.arcsec
-    matched_catalog = hstack([catalog_stars[mask], gaia_catalog[idx[mask]]])
+    matched_catalog = hstack([splus_catalog[mask], gaia_catalog[idx[mask]]])
 
     return matched_catalog
 
