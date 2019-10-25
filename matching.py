@@ -10,13 +10,12 @@ Find Gaia sources in S-PLUS catalog to perform calibration
 import numpy as np
 from astropy.coordinates import SkyCoord
 import astropy.units as u
-#from astroquery.gaia import Gaia
 from astroquery.vizier import Vizier
 from astropy.coordinates import Angle
 from astropy.io import fits
 from astropy.table import Table, hstack
 
-Vizier.ROW_LIMIT = 5000
+Vizier.ROW_LIMIT = 999999
 
 
 def read_splus_catalog(data_path, field, band):
@@ -97,17 +96,13 @@ def find_gaia_stars(ra, dec):
 
     splus_coords = SkyCoord(ra=ra, dec=dec, unit=(u.hour, u.deg), frame='icrs', equinox='J2000')
 
-    #gaia_data = Vizier.query_region(splus_coords, radius=Angle(1.0, "deg"), catalog=['I/345'])[0]
-    #gaia_data = Vizier(catalog='I/345', columns=['*', 'DR2Name', 'RA_ICRS', 'DE_ICRS', 'pmRA', 'pmDE', 'FG', 'e_FG', 'Gmag', 'e_Gmag', 'FBP', 'e_FBP', 'BPmag', 'e_BPmag', 'FRP', 'e_FRP', 'RPmag', 'e_RPmag', 'Teff', 'Rad', 'RAJ2000', 'DEJ2000']).query_region(splus_coords, radius=1*u.deg)[0]
-
-    v = Vizier(columns=['*', 'RAJ2000', 'DEJ2000'], catalog='I/345')
-    v.ROW_LIMIT = 999999999
-    gaia_data = v.query_region(splus_coords, radius=Angle(1.0, "deg"))[0]
+    vizier = Vizier(columns=['*', 'RAJ2000', 'DEJ2000'], catalog='I/345')
+    gaia_data = vizier.query_region(splus_coords, radius=Angle(1.0, "deg"))[0]
 
     # Only keep objects with detected proper motions to exclude contamination by galaxies
     # FIXME: We are selecting objects with pre-calculated radius
-    pm_flag = (gaia_data['pmRA'] > 0) & (gaia_data['Rad'] > 0.5) & (gaia_data['Rad'] < 1.5)
-    gaia_data = gaia_data[pm_flag]
+    flag = (gaia_data['pmRA'] > 0) & (gaia_data['Rad'] > 0.5) & (gaia_data['Rad'] < 1.5)
+    gaia_data = gaia_data[flag]
 
     print('>>> Found', len(gaia_data), ' matches with Gaia')
 
@@ -131,21 +126,23 @@ def plot_hr(gaia_data):
 
     plt.show()
 
+
 def match_splus_gaia(splus_catalog, gaia_catalog):
     """
 
-    match the splus and gaia catalogs and return the joined table
+    Match the splus and gaia catalogs and return the matched table
 
     """
 
     a = SkyCoord(ra=splus_catalog['ALPHA_J2000'], dec=splus_catalog['DELTA_J2000'], unit=(u.deg, u.deg))
-    b = SkyCoord(ra=gaia_data['RAJ2000'], dec=gaia_data['DEJ2000'], unit=(u.deg, u.deg))
+    b = SkyCoord(ra=gaia_catalog['RAJ2000'], dec=gaia_catalog['DEJ2000'], unit=(u.deg, u.deg))
     idx, d2d, d3d = a.match_to_catalog_3d(b)
 
     mask = d2d < 1.0 * u.arcsec
-    result = hstack([catalog_stars[mask], gaia_data[idx[mask]]])
+    matched_catalog = hstack([catalog_stars[mask], gaia_catalog[idx[mask]]])
 
-    return result
+    return matched_catalog
+
 
 # This is just for testing purposes:
 if __name__ == '__main__':
