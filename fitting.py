@@ -181,6 +181,44 @@ def fit_models_coelho2014(model_dict, gaia_data):
                            }
 
 
+def fit_models_ngsl(ngsl_table, gaia_matched_catalog):
+    """
+
+    FIXME: Using gaia observed magnitudes for ngsl stars, models are slightly bluer than gaia data.
+
+    Fits NGSL models to gaia Data
+
+    Parameters
+    ------------
+    model_dict:
+    ngsl_table:
+    gaia_catalog:
+
+    ------------
+    return:
+
+    """
+
+    model_colors = ngsl_table['bp_rp']
+    obs_colors = gaia_matched_catalog['BP-RP']
+
+    model_mags = 5 + 5 * np.log10(ngsl_table['parallax']) - 15 + ngsl_table['phot_g_mean_mag']
+    obs_mags = 5 + 5 * np.log10(gaia_matched_catalog['Plx']) - 15 + gaia_matched_catalog['Gmag']
+
+    gaia_matched_catalog['best_fit'] = np.zeros(len(gaia_matched_catalog), dtype=int)
+
+    for i in range(len(gaia_matched_catalog)):
+        print('>>> Fitting ', i+1, 'of ', len(gaia_matched_catalog))
+
+        chi2s = np.array([np.sqrt((obs_colors[i]-model_colors[j])**2 + (obs_mags[i]-model_mags[j])**2)
+                          for j in range(len(model_colors))])
+
+        best_chi2 = np.min(chi2s[~np.isnan(chi2s)])
+        gaia_matched_catalog['best_fit'][i] = np.argwhere(chi2s == best_chi2)[0][0]
+
+    return gaia_matched_catalog
+
+
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from matching import *
@@ -222,8 +260,14 @@ if __name__ == '__main__':
     catalog = read_splus_catalog('data/STRIPE82-0001/', 'STRIPE82-0001', 'R')
     catalog_stars = find_splus_stars(catalog)
     gaia_data = find_gaia_stars(test_ra, test_dec)
-    match_data = match_splus_gaia(catalog_stars, gaia_data)
+    matched_data = match_splus_gaia(catalog_stars, gaia_data)
 
-    plot_hr(match_data)
-    plt.scatter(ngsl_table['bp_rp'], 5 + 5 * np.log10(ngsl_table['parallax']) - 15 + ngsl_table['phot_g_mean_mag'], s=5)
-    plt.scatter(model_mags['BP']-model_mags['RP'], 5 + 5 * np.log10(ngsl_table['parallax']) - 15 + model_mags['G'], s=5)
+    fitted_catalog = fit_models_ngsl(ngsl_table, matched_data)
+
+    plot_hr(matched_data)
+    plt.scatter(ngsl_table['bp_rp'], 5 + 5 * np.log10(ngsl_table['parallax']) - 15 + ngsl_table['phot_g_mean_mag'], s=15)
+    # plt.scatter(model_mags['BP']-model_mags['RP'], 5 + 5 * np.log10(ngsl_table['parallax']) - 15 + model_mags['G'], s=5)
+
+    best_fits = fitted_catalog['best_fit']
+    plt.scatter(ngsl_table['bp_rp'][best_fits], 5 + 5 * np.log10(ngsl_table['parallax'])[best_fits]
+                - 15 + ngsl_table['phot_g_mean_mag'][best_fits], s=2)
