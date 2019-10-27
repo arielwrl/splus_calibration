@@ -128,12 +128,14 @@ def plot_hr(gaia_data):
     plt.show()
 
 
-def match_splus_gaia(splus_catalog, gaia_catalog):
+def match_splus_gaia(splus_catalog, gaia_catalog, datapath='./'):
     """
 
     Match the splus and gaia catalogs and return the matched table
 
     """
+
+    print('matching SPLUS with Gaia...')
 
     a = SkyCoord(ra=splus_catalog['ALPHA_J2000'], dec=splus_catalog['DELTA_J2000'], unit=(u.deg, u.deg))
     b = SkyCoord(ra=gaia_catalog['RAJ2000'], dec=gaia_catalog['DEJ2000'], unit=(u.deg, u.deg))
@@ -142,6 +144,16 @@ def match_splus_gaia(splus_catalog, gaia_catalog):
     mask = d2d < 1.0 * u.arcsec
     matched_catalog = hstack([splus_catalog[mask], gaia_catalog[idx[mask]]])
 
+    print('saving fig', datapath + 'dif_coords.png')
+    plt.scatter(matched_catalog['ALPHA_J2000'] - matched_catalog['RAJ2000'],
+                matched_catalog['DELTA_J2000'] - matched_catalog['DEJ2000'],
+                s=15, color='b')
+    plt.xlabel(r'$\Delta \mathrm{RA\ [SPLUS - Gaia]}$')
+    plt.ylabel(r'$\Delta \mathrm{DEC\ [SPLUS - Gaia]}$')
+    plt.grid()
+    plt.savefig(datapath + 'dif_coords.png', format='png', dpi=120)
+    plt.close()
+
     return matched_catalog
 
 
@@ -149,16 +161,18 @@ def match_splus_gaia(splus_catalog, gaia_catalog):
 if __name__ == '__main__':
     plt.ion()
 
+    data_path = 'data/STRIPE82-0001/'
+
     tile_coords = Table.read('data/tiles_new20190701_clean.csv', format='ascii.csv')
 
     test_field = tile_coords['NAME'] == 'STRIPE82_0001'
 
     test_ra, test_dec = tile_coords['RA'][test_field], tile_coords['DEC'][test_field]
 
-    catalog = read_splus_catalog('data/STRIPE82-0001/', 'STRIPE82-0001', 'R')
+    catalog = read_splus_catalog(data_path, 'STRIPE82-0001', 'R')
     catalog_stars = find_splus_stars(catalog)
     gaia_data = find_gaia_stars(test_ra, test_dec)
-    match_data = match_splus_gaia(catalog_stars, gaia_data)
+    match_data = match_splus_gaia(catalog_stars, gaia_data, datapath=data_path)
 
     plot_hr(gaia_data)
 
