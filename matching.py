@@ -14,8 +14,7 @@ from astroquery.vizier import Vizier
 from astropy.coordinates import Angle
 from astropy.io import fits
 from astropy.table import Table, hstack
-
-Vizier.ROW_LIMIT = 999999
+import matplotlib.pyplot as plt
 
 
 def read_splus_catalog(data_path, field, band):
@@ -96,12 +95,14 @@ def find_gaia_stars(ra, dec):
 
     splus_coords = SkyCoord(ra=ra, dec=dec, unit=(u.hour, u.deg), frame='icrs', equinox='J2000')
 
-    vizier = Vizier(columns=['*', 'RAJ2000', 'DEJ2000'], catalog='I/345')
-    gaia_data = vizier.query_region(splus_coords, radius=Angle(1.0, "deg"))[0]
+    vizier_search = Vizier(columns=['*', 'RAJ2000', 'DEJ2000'], catalog='I/345')
+    vizier_search.ROW_LIMIT = 999999999
+
+    gaia_data = vizier_search.query_region(splus_coords, radius=Angle(1.0, "deg"))[0]
 
     # Only keep objects with detected proper motions to exclude contamination by galaxies
     # FIXME: We are selecting objects with pre-calculated radius
-    flag = (gaia_data['pmRA'] > 0) & (gaia_data['Rad'] > 0.5) & (gaia_data['Rad'] < 1.5)
+    flag = (gaia_data['pmRA'] > 0) & (gaia_data['Rad'] > 0.5) & (gaia_data['Rad'] < 3.0)
     gaia_data = gaia_data[flag]
 
     print('>>> Found', len(gaia_data), ' matches with Gaia')
@@ -121,7 +122,7 @@ def plot_hr(gaia_data):
 
     """
 
-    plt.scatter(gaia_data['BP-RP'], 5 + 5 * np.log10(gaia_data['Plx']) - 15 +  gaia_data['Gmag'], s=5)
+    plt.scatter(gaia_data['BP-RP'], 5 + 5 * np.log10(gaia_data['Plx']) - 15 + gaia_data['Gmag'], s=5)
     plt.gca().invert_yaxis()
 
     plt.show()
@@ -146,7 +147,6 @@ def match_splus_gaia(splus_catalog, gaia_catalog):
 
 # This is just for testing purposes:
 if __name__ == '__main__':
-    import matplotlib.pyplot as plt
     plt.ion()
 
     tile_coords = Table.read('data/tiles_new20190701_clean.csv', format='ascii.csv')
@@ -162,11 +162,3 @@ if __name__ == '__main__':
 
     plot_hr(gaia_data)
 
-    # This is just some thoughts about models:
-    #
-    # model = fits.open('data/s_coelho14_sed/t09000_g+2.0_m05p00_sed.fits')
-    #
-    # log_wl = np.array([model[0].header['CRVAL1'] + i * model[0].header['CDELT1']
-    #                    for i in range(model[0].header['NAXIS1'])])
-    #
-    # flux = model[0].data

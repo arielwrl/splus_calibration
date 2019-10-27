@@ -59,6 +59,43 @@ def read_models_coelho2014(model_dir):
     return models_dict
 
 
+def read_models_ngsl(model_dir, table_fname):
+    """
+
+    Reads the Coelho (2014) models to a dictionary
+
+    Parameters
+    ------------
+    model_dir: str
+        directory on which models are stored
+
+    ------------
+    return: dict
+        Dictionary with models
+
+    """
+
+    model_table = Table.read(table_fname)
+
+    model_dict = {'name': np.array([model_table['Target Name'][i].lower() for i in range(len(model_table))]),
+                  'wl': np.zeros((len(model_table), 2885)),
+                  'flux': np.zeros((len(model_table), 2885))
+                  }
+
+    for i in range(len(model_table)):
+        print('>>> Reading model ', i + 1, model_dict['name'][i])
+
+        model = fits.open(model_dir + 'h_stis_ngsl_' + model_dict['name'][i].strip() + '_v2.fits')
+
+        wl = np.array([model[1].data[j][0] for j in range(2885)])
+        flux = np.array([model[1].data[j][1] for j in range(2885)])
+
+        model_dict['wl'][i] = wl
+        model_dict['flux'][i] = flux
+
+    return model_dict
+
+
 def normalize_gaia_data(gaia_data):
     """
 
@@ -76,7 +113,7 @@ def normalize_gaia_data(gaia_data):
     return gaia_norm_mags
 
 
-def calc_syn_mags(model_dict):
+def calc_syn_mags(model_dict, lib='ngsl'):
     """
 
     Calculates synthetic magnitudes normalized by stellar radius
@@ -85,14 +122,26 @@ def calc_syn_mags(model_dict):
     :return:
     """
 
-    rp_syn = np.array([synmag(model_dict['lin_wl'], model_dict['flux'][i], 'data/filters/GAIA_GAIA2.Grp.dat')
-                       for i in range(len(model_dict['flux']))])
+    if lib == 'coelho2014':
 
-    bp_syn = np.array([synmag(model_dict['lin_wl'], model_dict['flux'][i], 'data/filters/GAIA_GAIA2.Gbp.dat')
-                       for i in range(len(model_dict['flux']))])
+        rp_syn = np.array([synmag(model_dict['lin_wl'], model_dict['flux'][i], 'data/filters/GAIA_GAIA2.Grp.dat')
+                           for i in range(len(model_dict['flux']))])
 
-    g_syn = np.array([synmag(model_dict['lin_wl'], model_dict['flux'][i], 'data/filters/GAIA_GAIA2.G.dat')
-                      for i in range(len(model_dict['flux']))])
+        bp_syn = np.array([synmag(model_dict['lin_wl'], model_dict['flux'][i], 'data/filters/GAIA_GAIA2.Gbp.dat')
+                           for i in range(len(model_dict['flux']))])
+
+        g_syn = np.array([synmag(model_dict['lin_wl'], model_dict['flux'][i], 'data/filters/GAIA_GAIA2.G.dat')
+                          for i in range(len(model_dict['flux']))])
+
+    if lib == 'ngsl':
+        rp_syn = np.array([synmag(model_dict['wl'][i], model_dict['flux'][i], 'data/filters/GAIA_GAIA2.Grp.dat')
+                           for i in range(len(model_dict['flux']))])
+
+        bp_syn = np.array([synmag(model_dict['wl'][i], model_dict['flux'][i], 'data/filters/GAIA_GAIA2.Gbp.dat')
+                           for i in range(len(model_dict['flux']))])
+
+        g_syn = np.array([synmag(model_dict['wl'][i], model_dict['flux'][i], 'data/filters/GAIA_GAIA2.G.dat')
+                          for i in range(len(model_dict['flux']))])
 
     synmags = {'G': g_syn,
                'BP': bp_syn,
@@ -104,6 +153,8 @@ def calc_syn_mags(model_dict):
 
 def fit_models_coelho2014(model_dict, gaia_data):
     """
+
+    FIXME: Ongoing work
 
     Parameters
     ------------
@@ -130,22 +181,49 @@ def fit_models_coelho2014(model_dict, gaia_data):
                            }
 
 
-
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
-    from matching import find_gaia_stars
+    from matching import *
     from astropy.table import Table
 
-    model_dir = 'data/s_coelho14_sed/'
+    # For Coelho 2014 models
+    # FIXME: Coelho (2014) fitting procedure to be done
+    #
+    # model_dir = 'data/s_coelho14_sed/'
+    #
+    # models = read_models_coelho2014(model_dir)
+    #
+    # for i in [0, 10, 100, 1000, 1500, 2000, 2500, 3000]:
+    #     plt.plot(models['lin_wl'], models['flux'][i])
+    #
+    # tile_coords = Table.read('data/tiles_new20190701_clean.csv', format='ascii.csv')
+    # test_field = tile_coords['NAME'] == 'STRIPE82_0001'
+    # test_ra, test_dec = tile_coords['RA'][test_field], tile_coords['DEC'][test_field]
+    #
+    # gaia_data = find_gaia_stars(test_ra, test_dec)
 
-    models = read_models_coelho2014(model_dir)
+    # For NGSL models
+    model_dir = '/home/ariel/Workspace/S-PLUS/splus_calibration/data/NGSL/stis_ngsl_v2/'
+    table_fname = 'data/NGSL/ngsl_gaia.fits'
 
-    for i in [0, 10, 100, 1000, 1500, 2000, 2500, 3000]:
-        plt.plot(models['lin_wl'], models['flux'][i])
+    ngsl_table = Table.read(table_fname)
+
+    models = read_models_ngsl(model_dir, table_fname)
+
+    for i in [0, 10, 50, 60, 70, 100, 150, 200, 250, 300, 350]:
+        plt.plot(models['wl'][i], models['flux'][i])
+
+    model_mags = calc_syn_mags(models)
 
     tile_coords = Table.read('data/tiles_new20190701_clean.csv', format='ascii.csv')
     test_field = tile_coords['NAME'] == 'STRIPE82_0001'
     test_ra, test_dec = tile_coords['RA'][test_field], tile_coords['DEC'][test_field]
 
+    catalog = read_splus_catalog('data/STRIPE82-0001/', 'STRIPE82-0001', 'R')
+    catalog_stars = find_splus_stars(catalog)
     gaia_data = find_gaia_stars(test_ra, test_dec)
+    match_data = match_splus_gaia(catalog_stars, gaia_data)
 
+    plot_hr(match_data)
+    plt.scatter(ngsl_table['bp_rp'], 5 + 5 * np.log10(ngsl_table['parallax']) - 15 + ngsl_table['phot_g_mean_mag'], s=5)
+    plt.scatter(model_mags['BP']-model_mags['RP'], 5 + 5 * np.log10(ngsl_table['parallax']) - 15 + model_mags['G'], s=5)
