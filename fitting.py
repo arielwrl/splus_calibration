@@ -216,7 +216,59 @@ def fit_models_ngsl(ngsl_table, gaia_matched_catalog):
         best_chi2 = np.min(chi2s[~np.isnan(chi2s)])
         gaia_matched_catalog['best_fit'][i] = np.argwhere(chi2s == best_chi2)[0][0]
 
+    # Let's store the distance to the templates and to each star, which will be necessary to find zero points
+
+    d_star = 3.085677e18 * 1000 / gaia_matched_catalog['Plx']
+    d_model = 3.085677e18 * 1000 / ngsl_table['parallax'][gaia_matched_catalog['best_fit']]
+
+    gaia_matched_catalog['d_star'] = d_star
+    gaia_matched_catalog['d_model'] = d_model
+
+    gaia_matched_catalog['fitted_template_wl'] = model_dict['wl'][fitted_catalog['best_fit']]
+    gaia_matched_catalog['fitted_template_flux'] = model_dict['flux'][fitted_catalog['best_fit']]
+
+    normalization = 4 * np.pi * (d_model/d_star)**2
+
+    flux_obsframe = gaia_matched_catalog['fitted_template_flux'] * normalization[:, np.newaxis]
+
+    gaia_matched_catalog['fitted_template_obsframe'] = flux_obsframe
+
+    # Synphot in models
+
+    filter_list = ['SPLUS_F378', 'SPLUS_F395', 'SPLUS_F410', 'SPLUS_F430', 'SPLUS_F515', 'SPLUS_F660', 'SPLUS_F861',
+                   'SPLUS_U', 'SPLUS_G', 'SPLUS_R', 'SPLUS_I', 'SPLUS_Z']
+    filter_dir = 'data/filters/'
+
+    filter_dict = {}
+    for filt in filter_list:
+        filter_dict[filt] = np.genfromtxt(filter_dir + filt + '.dat').transpose()
+
+    gaia_matched_catalog['syn_mags_splus'] = np.zeros((len(gaia_matched_catalog), 12))
+    for i in range(len(gaia_matched_catalog)):
+
+        wl, flux = gaia_matched_catalog['fitted_template_wl'][i], gaia_matched_catalog['fitted_template_obsframe'][i]
+
+        m_syn = np.array([synmag(wl, flux, filter_curve=filter_dict[filter_list[j]]) for j in range(12)])
+
+        gaia_matched_catalog['syn_mags_splus'][i] = m_syn
+
     return gaia_matched_catalog
+
+
+def splus_synmags(fitted_catalog, models_dict):
+    """
+
+    Calculates splus magnitudes for a set of fitted models
+
+    :param fitted_catalog:
+    :param models_dict:
+    :return:
+    """
+
+    # Put models in the distance of the observed_stars
+
+
+
 
 
 if __name__ == '__main__':
@@ -266,8 +318,13 @@ if __name__ == '__main__':
 
     plot_hr(matched_data)
     plt.scatter(ngsl_table['bp_rp'], 5 + 5 * np.log10(ngsl_table['parallax']) - 15 + ngsl_table['phot_g_mean_mag'], s=15)
-    # plt.scatter(model_mags['BP']-model_mags['RP'], 5 + 5 * np.log10(ngsl_table['parallax']) - 15 + model_mags['G'], s=5)
+    plt.scatter(model_mags['BP']-model_mags['RP'], 5 + 5 * np.log10(ngsl_table['parallax']) - 15 + model_mags['G'], s=5)
 
     best_fits = fitted_catalog['best_fit']
     plt.scatter(ngsl_table['bp_rp'][best_fits], 5 + 5 * np.log10(ngsl_table['parallax'])[best_fits]
                 - 15 + ngsl_table['phot_g_mean_mag'][best_fits], s=2)
+
+
+
+
+
