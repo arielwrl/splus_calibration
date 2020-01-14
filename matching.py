@@ -102,7 +102,7 @@ def find_gaia_stars(ra, dec):
 
     # Only keep objects with detected proper motions to exclude contamination by galaxies
     # FIXME: We are selecting objects with pre-calculated radius
-    flag = (gaia_data['pmRA'] > 0) & (gaia_data['Rad'] > 0.5) & (gaia_data['Rad'] < 3.0)
+    flag = (gaia_data['pmRA'] > 0) & (gaia_data['Rad'] > 0.5) & (gaia_data['Rad'] < 100.0)
     gaia_data = gaia_data[flag]
 
     print('>>> Found', len(gaia_data), ' matches with Gaia')

@@ -181,7 +181,7 @@ def fit_models_coelho2014(model_dict, gaia_data):
                            }
 
 
-def fit_models_ngsl(ngsl_table, gaia_matched_catalog):
+def fit_models_ngsl(ngsl_table, gaia_matched_catalog, model_dict):
     """
 
     FIXME: Using gaia observed magnitudes for ngsl stars, models are slightly bluer than gaia data.
@@ -224,8 +224,8 @@ def fit_models_ngsl(ngsl_table, gaia_matched_catalog):
     gaia_matched_catalog['d_star'] = d_star
     gaia_matched_catalog['d_model'] = d_model
 
-    gaia_matched_catalog['fitted_template_wl'] = model_dict['wl'][fitted_catalog['best_fit']]
-    gaia_matched_catalog['fitted_template_flux'] = model_dict['flux'][fitted_catalog['best_fit']]
+    gaia_matched_catalog['fitted_template_wl'] = model_dict['wl'][gaia_matched_catalog['best_fit']]
+    gaia_matched_catalog['fitted_template_flux'] = model_dict['flux'][gaia_matched_catalog['best_fit']]
 
     normalization = 4 * np.pi * (d_model/d_star)**2
 
@@ -255,42 +255,16 @@ def fit_models_ngsl(ngsl_table, gaia_matched_catalog):
     return gaia_matched_catalog
 
 
-def splus_synmags(fitted_catalog, models_dict):
-    """
-
-    Calculates splus magnitudes for a set of fitted models
-
-    :param fitted_catalog:
-    :param models_dict:
-    :return:
-    """
-
-    # Put models in the distance of the observed_stars
-
-
-
-
-
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from matching import *
     from astropy.table import Table
+    import seaborn as sns
+    from matplotlib import rc
 
-    # For Coelho 2014 models
-    # FIXME: Coelho (2014) fitting procedure to be done
-    #
-    # model_dir = 'data/s_coelho14_sed/'
-    #
-    # models = read_models_coelho2014(model_dir)
-    #
-    # for i in [0, 10, 100, 1000, 1500, 2000, 2500, 3000]:
-    #     plt.plot(models['lin_wl'], models['flux'][i])
-    #
-    # tile_coords = Table.read('data/tiles_new20190701_clean.csv', format='ascii.csv')
-    # test_field = tile_coords['NAME'] == 'STRIPE82_0001'
-    # test_ra, test_dec = tile_coords['RA'][test_field], tile_coords['DEC'][test_field]
-    #
-    # gaia_data = find_gaia_stars(test_ra, test_dec)
+    plt.ion()
+    sns.set_style('whitegrid')
+    rc('text', usetex=True)
 
     # For NGSL models
     model_dir = '/home/ariel/Workspace/S-PLUS/splus_calibration/data/NGSL/stis_ngsl_v2/'
@@ -299,9 +273,6 @@ if __name__ == '__main__':
     ngsl_table = Table.read(table_fname)
 
     models = read_models_ngsl(model_dir, table_fname)
-
-    for i in [0, 10, 50, 60, 70, 100, 150, 200, 250, 300, 350]:
-        plt.plot(models['wl'][i], models['flux'][i])
 
     model_mags = calc_syn_mags(models)
 
@@ -314,17 +285,33 @@ if __name__ == '__main__':
     gaia_data = find_gaia_stars(test_ra, test_dec)
     matched_data = match_splus_gaia(catalog_stars, gaia_data)
 
-    fitted_catalog = fit_models_ngsl(ngsl_table, matched_data)
+    fitted_catalog = fit_models_ngsl(ngsl_table, matched_data, models)
 
-    plot_hr(matched_data)
-    plt.scatter(ngsl_table['bp_rp'], 5 + 5 * np.log10(ngsl_table['parallax']) - 15 + ngsl_table['phot_g_mean_mag'], s=15)
-    plt.scatter(model_mags['BP']-model_mags['RP'], 5 + 5 * np.log10(ngsl_table['parallax']) - 15 + model_mags['G'], s=5)
+    plt.scatter(fitted_catalog['BP-RP'], 5 + 5 * np.log10(fitted_catalog['Plx']) - 15 + fitted_catalog['Gmag'], s=5,
+                label='Gaia Data')
+    plt.scatter(ngsl_table['bp_rp'], 5 + 5 * np.log10(ngsl_table['parallax']) - 15 + ngsl_table['phot_g_mean_mag'], s=5,
+                label='NGSL Stars')
+    # plt.scatter(model_mags['BP']-model_mags['RP'], 5 + 5 * np.log10(ngsl_table['parallax']) - 15 + model_mags['G'], s=5)
+    plt.gca().invert_yaxis()
 
-    best_fits = fitted_catalog['best_fit']
-    plt.scatter(ngsl_table['bp_rp'][best_fits], 5 + 5 * np.log10(ngsl_table['parallax'])[best_fits]
-                - 15 + ngsl_table['phot_g_mean_mag'][best_fits], s=2)
+    plt.xlabel(r'$G_B - G_R$', fontsize=16)
+    plt.ylabel(r'$G$', fontsize=16)
 
+    leg = plt.legend(frameon=False, fontsize=16)
+    for handle in leg.legendHandles:
+        handle.set_sizes([25.0])
 
+    # best_fit = fitted_catalog['best_fit']
+    # plt.scatter(ngsl_table['bp_rp'][best_fit], 5 + 5 * np.log10(ngsl_table['parallax'])[best_fit]
+    #             - 15 + ngsl_table['phot_g_mean_mag'][best_fit], marker='X')
+
+    for i in [20, 50, 70, 250, 350, 400]:
+        plt.plot(fitted_catalog['fitted_template_wl'][i], fitted_catalog['fitted_template_flux'][i], lw=0.5)
+ # * 4 * np.pi *
+ # fitted_catalog['d_star'][i] ** 2) / 3.9e33
+ #
+    plt.xlabel(r'$\lambda[\mathrm{\AA}]$', fontsize=16)
+    plt.ylabel(r'$F_\lambda$', fontsize=16)
 
 
 
